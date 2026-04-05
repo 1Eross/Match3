@@ -21,21 +21,21 @@ public class Board
 
     private Stack<Gem.GemType> _excludeList = new Stack<Gem.GemType>();
 
-    private bool[] _dirtyRows = new bool[XSize];
-    private bool[] _dirtyCols = new bool[YSize];
+    private bool[] _dirtyRows = new bool[YSize]; // Rows Iterates over col (y)
+    private bool[] _dirtyCols = new bool[XSize]; // Col Iterates over row (x)
 
-    private HashSet<(int, int)> _matches = new HashSet<(int, int)>();
+    // CAN STORE (IDX, LAST_SEEN_NONE) TO AVOID GO THROUGH XSize
+    private bool[] _hasMatchCol = new bool[XSize]; // Col Iterates over X
+    private int[] _lastNoneInCol = new int[XSize]; // Col Iterates over X
+
+    private HashSet<(int, int)> _matches = new HashSet<(int, int)>(); // (y, x)
 
     private Stack<Gem> _freeGems = new Stack<Gem>();
 
-
-    // Should doesn't delete gems, but change form and fill from above to GC doesn't slow app run
-
-    // ???GetTile returns link or copy in heap????
     private Gem? get_tile(int x, int y) => _grid[y + (x * YSize)];
     private void set_tile(int x, int y, Gem? gem) => _grid[y + (x * YSize)] = gem;
 
-    private Span<Gem?> get_col_span(int x, int y, int lenght) => _grid.AsSpan(get_tile_idx(x, y), lenght);
+    // private Span<Gem?> get_col_span(int x, int y, int lenght) => _grid.AsSpan(get_tile_idx(x, y), lenght);
     private static int get_tile_idx(int x, int y) => y + (x * YSize);
 
     private void fill_grid_random()
@@ -89,13 +89,38 @@ public class Board
     {
         int dx = Math.Abs(x1 - x2);
         int dy = Math.Abs(y1 - y2);
-        return (dx - dy) == 1;
+        return (dx + dy) == 1;
     }
 
     private void MarkDirty(int x, int y)
     {
-        _dirtyRows[x] = true;
-        _dirtyCols[y] = true;
+        _dirtyRows[y] = true;
+        _dirtyCols[x] = true;
+    }
+
+    private void ClearDirtyFlags()
+    {
+        for (var j = 0; j < XSize; j++)
+            _dirtyRows[j] = false;
+        for (var i = 0; i < YSize; i++)
+            _dirtyCols[i] = false;
+    }
+
+    private void ClearMatchSet()
+    {
+        _matches.Clear();
+    }
+
+    private void ClearMatchesFlags()
+    {
+        for (var i = 0; i < YSize; i++)
+            _hasMatchCol[i] = false;
+    }
+
+    private void ClearLastNoneIds()
+    {
+        for (var i = 0; i < YSize; i++)
+            _lastNoneInCol[i] = -1;
     }
 
     private void Swap(int x1, int y1, int x2, int y2)
@@ -114,6 +139,11 @@ public class Board
         MarkDirty(x1, y1);
         MarkDirty(x2, y2);
         return true;
+    }
+
+    public void SwapBack(int x1, int y1, int x2, int y2)
+    {
+        Swap(x1, y1, x2, y2);
     }
 
     private void ScanCol(int x)
@@ -137,9 +167,10 @@ public class Board
                     _matches.Add((x, j));
                     _matches.Add((x, j - 1));
                     _matches.Add((x, j - 2));
+                    _hasMatchCol[x] = true;
                     break;
                 case > 3:
-                    _matches.Add((x, j));
+                    _matches.Add((j, x));
                     break;
             }
         }
@@ -164,8 +195,9 @@ public class Board
             {
                 case 3:
                     _matches.Add((i, y));
-                    _matches.Add((i, y - 1));
-                    _matches.Add((i, y - 2));
+                    _matches.Add((i - 1, y));
+                    _matches.Add((i - 2, y));
+                    _hasMatchCol[i] = true;
                     break;
                 case > 3:
                     _matches.Add((i, y));
@@ -178,12 +210,12 @@ public class Board
     {
         _matches.Clear();
 
-        for (int i = 0; i < XSize; i++)
-            if (_dirtyRows[i])
+        for (var i = 0; i < XSize; i++)
+            if (_dirtyCols[i])
                 ScanCol(i);
 
-        for (int j = 0; j < YSize; j++)
-            if (_dirtyCols[j])
+        for (var j = 0; j < YSize; j++)
+            if (_dirtyRows[j])
                 ScanRow(j);
 
         return _matches.Count > 0;
@@ -194,13 +226,14 @@ public class Board
     {
         _freeGems.Push(get_tile(x, y)!);
         set_tile(x, y, null);
+        _dirtyCols[x] = true;
     }
 
     public void CollectMatches()
     {
         foreach (var (x, y) in _matches)
         {
-            CollectMatch(y, x);
+            CollectMatch(x, y);
         }
     }
 
@@ -208,54 +241,93 @@ public class Board
     // Wanted to do with memmove (Spans) but it doesnt work
     private void FallCol(int x)
     {
-        int down_pointer = 0;
-        int up_pointer = 0;
-
-        for (var j = YSize; j > 0; j--)
-            if (get_tile(x, j) is null)
-            {
-                down_pointer = j;
-                break;
-            }
-
-        for (var j = down_pointer; j > 0; j--)
-            if (get_tile(x, j) is not null)
-            {
-                up_pointer = j;
-                break;
-            }
-
-        while (down_pointer < 0)
+        var writePos = YSize - 1;
+        for (var j = YSize - 1; j >= 0; j--)
         {
-            // Need to get not empty span from start of list to first !empty el (up_pointer) of col
-            var notEmptySpanToFillWith = get_col_span(x, 0, up_pointer);
-            // Need to get empty span from up_pointer to down_pointer of col
-            var emptySpanToBeFilled = get_col_span(x, up_pointer, down_pointer - up_pointer);
+            if (get_tile(x, j) is null) continue;
 
-            notEmptySpanToFillWith.Slice(up_pointer - emptySpanToBeFilled.Length, emptySpanToBeFilled.Length)
-                .CopyTo(emptySpanToBeFilled);
-            // СopyTo ДВИГАЕТ ПАМЯТЬ, используя memmove РАБОТАЕТ ОК
+            set_tile(x, writePos, get_tile(x, j));
+            if (writePos != j)
+            {
+                set_tile(x, j, null);
+                _dirtyCols[x] = true;
+                _dirtyRows[writePos] = true;
+            }
+
+            writePos--;
+        }
+
+        _lastNoneInCol[x] = writePos;
+    }
+
+    public void FallCols()
+    {
+        for (var i = 0; i < XSize; i++)
+        {
+            if (!_dirtyCols[i]) continue;
+            FallCol(i);
         }
     }
 
-    public void Falling()
+    private void FillCol(int x)
+    {
+        for (var j = _lastNoneInCol[x]; j >= 0; j--)
+        {
+            set_tile(x, j, _freeGems.Pop());
+            _dirtyRows[j] = true;
+        }
+
+        _dirtyCols[x] = true;
+    }
+
+    // CAN STORE (IDX, LAST_SEEN_NONE)
+    public void FillCols()
+    {
+        for (var i = 0; i < XSize; i++)
+        {
+            if (!_dirtyCols[i]) continue;
+            FillCol(i);
+        }
+    }
+
+    public void ReshuffleFreeGems()
     {
         // Update all gems types
         foreach (var gem in _freeGems)
-        {
             gem._setGemType(Gem.GetRandomGemType([], _random));
-        }
+    }
+
+    public void ClearAll()
+    {
+        ClearDirtyFlags();
+        ClearMatchSet();
+        ClearLastNoneIds();
+        ClearMatchesFlags();
     }
 
 
     public override string ToString()
     {
         var result = "";
-        for (int j = 0; j < YSize; j++)
+        for (var j = -1; j < YSize; j++)
         {
-            for (int i = 0; i < XSize; i++)
+            for (var i = -1; i < XSize; i++)
             {
-                result += $"{get_tile(i, j)} ";
+                if (i == -1 && j == -1) result += $"  ";
+                else if (i == -1 && j != -1) result += $"{j} ";
+                else if (i != -1 && j == -1) result += $"{i} ";
+                else
+                {
+                    var gem = get_tile(i, j);
+                    if (gem is null)
+                    {
+                        result += $"X ";
+                        continue;
+                    }
+
+
+                    result += $"{get_tile(i, j)} ";
+                }
             }
 
             result += "\n";

@@ -16,47 +16,58 @@ namespace Match3Easter
             {
             }
 
-            void MainLoop()
+            var board = new Board();
+
+            while (true)
             {
-                // LogicLoop();
-                // DrawLoop();
+                Console.Clear();
+                Console.WriteLine(board);
+                Console.Write("Swap (x1, y1, x2, y2): ");
+                var input = Console.ReadLine()?.Split(' ');
+                if (input is not { Length: 4 }) continue;
+                if (!int.TryParse(input[0], out var x1) ||
+                    !int.TryParse(input[1], out var y1) ||
+                    !int.TryParse(input[2], out var x2) ||
+                    !int.TryParse(input[3], out var y2))
+                {
+                    Console.WriteLine("Invalid input");
+                    continue;
+                }
+
+                if (!board.TrySwap(x1, y1, x2, y2))
+                {
+                    Console.WriteLine("Not neighbors");
+                    Console.ReadKey();
+                    continue;
+                }
+
+                if (!board.FindMatches())
+                {
+                    board.SwapBack(x1, y1, x2, y2);
+                    Console.WriteLine("No matches");
+                    Console.ReadKey();
+                    continue;
+                }
+
+                while (board.FindMatches())
+                {
+                    Console.Clear();
+                    Console.WriteLine(board);
+                    Console.Write("Matches Found");
+                    Console.ReadKey();
+                    board.CollectMatches();
+                    board.ReshuffleFreeGems();
+                    board.FallCols();
+                    board.FillCols();
+
+                    Console.Clear();
+                    Console.WriteLine(board);
+                    Console.Write("After gravity");
+                    Console.ReadKey();
+                }
+
+                board.ClearAll();
             }
-
-            // var board = new Board();
-            // Console.WriteLine(board);
-
-            int?[] intList = [null, 8, 7, null, null, 4, 3, 2, 1];
-            int downPointer = 0;
-            int upPointer = 0;
-            for (var j = intList.Length - 1; j >= 0; j--)
-                if (intList[j] is null)
-                {
-                    downPointer = j;
-                    break;
-                }
-
-            for (var j = downPointer - 1; j >= 0; j--)
-                if (intList[j] is not null)
-                {
-                    upPointer = j;
-                    break;
-                }
-
-            Console.WriteLine($"U:{upPointer}");
-            Console.WriteLine($"D:{downPointer}");
-
-            var notEmptySpanToFillWith = intList.AsSpan(0, upPointer + 1);
-            // Need to get empty span from up_pointer to down_pointer of col
-            var emptySpanToBeFilled = intList.AsSpan(upPointer + 1, downPointer - upPointer);
-
-            Console.WriteLine($"[{string.Join(", ", notEmptySpanToFillWith.ToArray())}]");
-            Console.WriteLine($"[{string.Join(", ", emptySpanToBeFilled.ToArray())}]");
-
-            // notEmptySpanToFillWith.Slice(upPointer, emptySpanToBeFilled.Length)
-            // .CopyTo(emptySpanToBeFilled);
-            notEmptySpanToFillWith.CopyTo(emptySpanToBeFilled);
-
-            Console.WriteLine($"[{string.Join(", ", intList)}]");
         }
     }
 }
