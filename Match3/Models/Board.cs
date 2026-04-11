@@ -262,8 +262,8 @@ public class Board
     {
         MarkDoubleBomb(x1, y1, x1, y1, 0);
 
-        for (var i = x1 - 1; i <= x1 + 1; i++)
-        for (var j = y1 - 1; j <= y1 + 1; j++)
+        for (var i = x1 - 2; i <= x1 + 2; i++)
+        for (var j = y1 - 2; j <= y1 + 2; j++)
         {
             if (i == x1 && j == y1) continue;
             if (!InBounds(i, j)) continue;
