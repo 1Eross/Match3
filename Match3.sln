@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Match3Easter", "Match3Easter\Match3Easter.csproj", "{5802643C-2E6C-4652-9426-A787D33A5845}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Match3", "Match3\Match3.csproj", "{5802643C-2E6C-4652-9426-A787D33A5845}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
