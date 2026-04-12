@@ -173,11 +173,11 @@ public class Board
         // On axis where Line moves -> should explode cross
         MarkLineCross(x1, y1, x1, y1, 0f); // Self el on x1,y1
 
-        for (var i = x1 + 1; i <= XSize; i++)
+        for (var i = x1 + 1; i < XSize; i++)
             MarkLineHorizontal(i, y1, x1, y1, baseTime);
         for (var i = x1 - 1; i >= 0; i--)
             MarkLineHorizontal(i, y1, x1, y1, baseTime);
-        for (var j = y1 + 1; j <= YSize; j++)
+        for (var j = y1 + 1; j < YSize; j++)
             MarkLineVertical(x1, j, x1, y1, baseTime);
         for (var j = y1 - 1; j >= 0; j--)
             MarkLineVertical(x1, j, x1, y1, baseTime);
@@ -211,7 +211,7 @@ public class Board
             if (!InBounds(x1, i)) continue;
             MarkLineVertical(i, y1, i, y1, 0f);
 
-            for (var j = y1 + 1; j <= YSize; j++)
+            for (var j = y1 + 1; j < YSize; j++)
                 MarkLineVertical(i, j, i, y1, baseTime);
             for (var j = y1 - 1; j >= 0; j--)
                 MarkLineVertical(i, j, i, y1, baseTime);
@@ -224,7 +224,7 @@ public class Board
         // On axis where goes Line -> should mark all line on deletion
         // On axis where goes Simple gem -> should mark dirty if it not in destroy are
         MarkLineHorizontal(x1, y1, x1, y1, 0f);
-        for (var i = x1 + 1; i <= XSize; i++)
+        for (var i = x1 + 1; i < XSize; i++)
             MarkLineHorizontal(i, y1, x1, y1, baseTime);
         for (var i = x1 - 1; i >= 0; i--)
             MarkLineHorizontal(i, y1, x1, y1, baseTime);
@@ -237,7 +237,7 @@ public class Board
         // On axis where goes Simple gem -> should mark dirty if it not in destroy are
         MarkLineVertical(x1, y1, x1, y1, 0);
 
-        for (var j = y1 + 1; j <= YSize; j++)
+        for (var j = y1 + 1; j < YSize; j++)
             MarkLineVertical(x1, j, x1, y1, baseTime);
         for (var j = y1 - 1; j >= 0; j--)
             MarkLineVertical(x1, j, x1, y1, baseTime);
@@ -442,7 +442,7 @@ public class Board
     public bool HasBonusMatches()
     {
         return _unionGroups.Values.Any(m => m.Count > 1 ||
-                                            _foundMatches[m[0]].Length > 0);
+                                            _foundMatches[m[0]].Length >= 4);
     }
 
     public (int x, int y)? FindIntersections(List<Match> intersections)
