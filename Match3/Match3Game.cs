@@ -20,7 +20,7 @@ public class Match3Game : Game
     private ScreenState _screenState = ScreenState.MainMenu;
 
     private Dictionary<GemType, Texture2D> _gemTextures;
-    private Dictionary<BonusType, Texture2D> _bonusTextures;
+    private Dictionary<(GemType, BonusType), Texture2D> _bonusGemTextures;
     private Dictionary<DestroyerType, Texture2D> _destroyerTextures;
     private Rectangle _playButtonRect;
     private Texture2D _playButtonTexture;
@@ -107,11 +107,38 @@ public class Match3Game : Game
             [GemType.Triangle] =
                 Texture2D.FromFile(GraphicsDevice, "Assets/triangle.png"), // Triangle -> bipyramid.png
         };
-        _bonusTextures = new Dictionary<BonusType, Texture2D>
+        _bonusGemTextures = new Dictionary<(GemType, BonusType), Texture2D>
         {
-            [BonusType.LineHorizontal] = Texture2D.FromFile(GraphicsDevice, "Assets/lineHorizontal.png"),
-            [BonusType.LineVertical] = Texture2D.FromFile(GraphicsDevice, "Assets/lineVertical1.png"),
-            [BonusType.Bomb] = Texture2D.FromFile(GraphicsDevice, "Assets/bomb.png")
+            [(GemType.Circle, BonusType.Bomb)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/circleBomb.png"),
+            [(GemType.Circle, BonusType.LineHorizontal)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/circleLineH.png"),
+            [(GemType.Circle, BonusType.LineVertical)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/circleLineV.png"),
+            [(GemType.Diamond, BonusType.Bomb)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/diamondBomb.png"),
+            [(GemType.Diamond, BonusType.LineHorizontal)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/diamondLineH.png"),
+            [(GemType.Diamond, BonusType.LineVertical)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/diamondLineV.png"),
+            [(GemType.Pentagon, BonusType.Bomb)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/pentagonBomb.png"),
+            [(GemType.Pentagon, BonusType.LineHorizontal)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/pentagonLineH.png"),
+            [(GemType.Pentagon, BonusType.LineVertical)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/pentagonLineV.png"),
+            [(GemType.Square, BonusType.Bomb)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/rectangleBomb.png"),
+            [(GemType.Square, BonusType.LineHorizontal)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/rectangleLineH.png"),
+            [(GemType.Square, BonusType.LineVertical)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/rectangleLineV.png"),
+            [(GemType.Triangle, BonusType.Bomb)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/triangleBomb.png"),
+            [(GemType.Triangle, BonusType.LineHorizontal)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/triangleLineH.png"),
+            [(GemType.Triangle, BonusType.LineVertical)] =
+                Texture2D.FromFile(GraphicsDevice, "Assets/triangleLineV.png"),
         };
         _destroyerTextures = new Dictionary<DestroyerType, Texture2D>
         {
@@ -553,56 +580,10 @@ public class Match3Game : Game
                 _animTimer += dt;
                 if (_animTimer >= AnimDuration)
                 {
-                    var gem1 = _board.GetGem(_swapX1, _swapY1)!;
-                    var gem2 = _board.GetGem(_swapX2, _swapY2)!;
-
-                    var bonusActivator = _board.ResolveBonusActivator(
-                        _board.ResolveBonusType(gem1._getBonusType(), gem2._getBonusType())
-                    );
-
-                    switch (
-                        gem1.isBonus(),
-                        gem2.isBonus())
-                    {
-                        case (false, false):
-                            _board.Swap(_swapX1, _swapY1, _swapX2, _swapY2);
-                            _board.MarkDirty(_swapX1, _swapY1);
-                            _board.MarkDirty(_swapX2, _swapY2);
-
-                            EnterGameState(_board.FindMatches() ? GameState.Matching : GameState.SwappingBack);
-
-                            break;
-                        case (true, false):
-                            _board.Swap(_swapX1, _swapY1, _swapX2, _swapY2);
-                            _board.MarkDirty(_swapX1, _swapY1);
-                            _board.MarkDirty(_swapX2, _swapY2);
-
-                            bonusActivator!(_swapX2, _swapY2, ActivationDuration);
-
-                            EnterGameState(_board.FindMatches() ? GameState.Matching : GameState.Removing);
-
-                            break;
-
-                        case (false, true):
-                            _board.Swap(_swapX1, _swapY1, _swapX2, _swapY2);
-                            _board.MarkDirty(_swapX1, _swapY1);
-                            _board.MarkDirty(_swapX2, _swapY2);
-
-                            bonusActivator!(_swapX1, _swapY1, ActivationDuration);
-
-                            EnterGameState(_board.FindMatches() ? GameState.Matching : GameState.Removing);
-
-                            break;
-
-                        case (true, true):
-
-                            _board.MergeBonus(_swapX1, _swapY1, _swapX2, _swapY2);
-
-                            bonusActivator!(_swapX2, _swapY2, ActivationDuration);
-
-                            EnterGameState(_board.FindMatches() ? GameState.Matching : GameState.Removing);
-                            break;
-                    }
+                    _board.Swap(_swapX1, _swapY1, _swapX2, _swapY2);
+                    _board.MarkDirty(_swapX1, _swapY1);
+                    _board.MarkDirty(_swapX2, _swapY2);
+                    EnterGameState(_board.FindMatches() ? GameState.Matching : GameState.SwappingBack);
                 }
 
                 break;
@@ -853,13 +834,14 @@ public class Match3Game : Game
 
             Texture2D texture;
 
-            if (gem._getGemType() != GemType.None)
+            if (gem._getBonusType() != BonusType.None &&
+                _bonusGemTextures.TryGetValue((gem._getGemType(), gem._getBonusType()), out var bonusTex))
+            {
+                texture = bonusTex;
+            }
+            else if (gem._getGemType() != GemType.None)
             {
                 texture = _gemTextures[gem._getGemType()];
-            }
-            else if (gem._getBonusType() != BonusType.None && _bonusTextures.ContainsKey(gem._getBonusType()))
-            {
-                texture = _bonusTextures[gem._getBonusType()];
             }
             else
             {

@@ -18,7 +18,6 @@ public class Gem(GemType gemType, BonusType bonusType = BonusType.None)
     internal void _setBonusType(BonusType bonusType)
     {
         _bonusType = bonusType;
-        _gemType = GemType.None;
     }
 
     // Potentially slow; Can use Stack as exclude var
