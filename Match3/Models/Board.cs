@@ -41,10 +41,11 @@ public class Board
     private readonly Dictionary<int, List<int>> _unionGroups = new();
 
     //Destruction
-    // private readonly List<DestructionEvent> _destructionEventList = [];
-    // TODO: add push | pop methods and make private
     private readonly Queue<DestructionEvent> _destructionEventQueue = new(); // (x, y)
     private readonly HashSet<(int, int)> _scheduleForRemoval = [];
+
+    // Score
+    private int _score = 0;
 
 // Getters Setters
     public int GetXSize() => XSize;
@@ -60,6 +61,8 @@ public class Board
 
     public bool TryDequeueDestructionEvent([MaybeNullWhen(false)] out DestructionEvent result) =>
         _destructionEventQueue.TryDequeue(out result);
+
+    public int GetScore() => _score;
 
 // private Span<Gem?> get_col_span(int x, int y, int lenght) => _grid.AsSpan(get_tile_idx(x, y), lenght);
 
@@ -533,6 +536,7 @@ public class Board
             _unionGroups[root].Add(i);
         }
     }
+
 // Finding Matches
 
     private void ScanCol(int x)
@@ -630,6 +634,8 @@ public class Board
             if (_protectedForRemoval.Contains((x, y))) continue;
             var gem = GetGem(x, y);
             if (gem is null) continue;
+
+            _score += 10;
 
             _freeGems.Push(gem);
             _SetGem(x, y, null);

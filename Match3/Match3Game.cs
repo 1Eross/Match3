@@ -15,11 +15,26 @@ public class Match3Game : Game
     private Texture2D _pixel;
     private Board _board;
 
+
     private GameState _state = GameState.Idle;
+    private ScreenState _screenState = ScreenState.MainMenu;
 
     private Dictionary<GemType, Texture2D> _gemTextures;
     private Dictionary<BonusType, Texture2D> _bonusTextures;
     private Dictionary<DestroyerType, Texture2D> _destroyerTextures;
+    private Rectangle _playButtonRect;
+    private Texture2D _playButtonTexture;
+    private Rectangle _newGameButtonRect;
+    private Texture2D _newGameButtonTexture;
+    private Texture2D _gameOverTexture;
+    private Texture2D _yourScoreTexture;
+    private Texture2D _scoreTexture;
+    private Texture2D _timeTexture;
+
+    private Texture2D _digitTexture;
+    private const int DigitWidth = 32;
+    private const int DigitHeight = 48;
+
 
     private readonly List<GemAnimation> _gemAnimations = [];
     private readonly List<DestroyerAnimation> _destroyerAnimations = [];
@@ -27,7 +42,6 @@ public class Match3Game : Game
     private float _animTimer;
     private const float AnimDuration = 0.25f;
     private const float RemovalAnimDuration = 0.1f;
-
     private const float ActivationDuration = 0.25f;
 
     private readonly Dictionary<(int x, int y), float> _removalStartTimes = new();
@@ -40,13 +54,22 @@ public class Match3Game : Game
 
     private int _swapX1, _swapY1, _swapX2, _swapY2;
 
+    private const int GridHeight = 8;
     private const int CellSize = 64;
+    private const int HudHeight = 80;
+    private const int BoardOffsetY = 0;
+    private const int BoardOffsetX = 0;
+    private const int WindowWidth = GridHeight * CellSize;
+    private const int WindowHeight = GridHeight * CellSize + HudHeight;
+
+    private const float _gameDuration = 60f;
+    private float _timeRemaining = _gameDuration;
 
     public Match3Game()
     {
         _graphics = new GraphicsDeviceManager(this);
-        _graphics.PreferredBackBufferWidth = 8 * CellSize;
-        _graphics.PreferredBackBufferHeight = 8 * CellSize;
+        _graphics.PreferredBackBufferWidth = WindowWidth;
+        _graphics.PreferredBackBufferHeight = WindowHeight;
         IsMouseVisible = true;
     }
 
@@ -55,6 +78,14 @@ public class Match3Game : Game
         // TODO: Add your initialization logic here (e.g., non-content variables)
         _board = new Board();
         base.Initialize();
+    }
+
+    protected void StartNewGame()
+    {
+        _board = new Board();
+        _state = GameState.Idle;
+        _animTimer = 0f;
+        _timeRemaining = _gameDuration;
     }
 
     protected override void LoadContent()
@@ -89,10 +120,31 @@ public class Match3Game : Game
             [DestroyerType.South] = Texture2D.FromFile(GraphicsDevice, "Assets/destroyerSouth.png"),
             [DestroyerType.North] = Texture2D.FromFile(GraphicsDevice, "Assets/destroyerNorth.png"),
         };
+
+        _playButtonRect = new Rectangle(
+            GraphicsDevice.Viewport.Width / 2 - 100,
+            GraphicsDevice.Viewport.Height / 2 - 30,
+            200, 60);
+
+        _playButtonTexture = Texture2D.FromFile(GraphicsDevice, "Assets/playButton.png");
+
+        _newGameButtonRect = new Rectangle(GraphicsDevice.Viewport.Width / 2 - 100,
+            GraphicsDevice.Viewport.Height / 2 - 30,
+            200, 60);
+
+        _newGameButtonTexture = Texture2D.FromFile(GraphicsDevice, "Assets/newGameButton.png");
+        _gameOverTexture = Texture2D.FromFile(GraphicsDevice, "Assets/gameOver.png");
+        _scoreTexture = Texture2D.FromFile(GraphicsDevice, "Assets/score.png");
+        _timeTexture = Texture2D.FromFile(GraphicsDevice, "Assets/time.png");
+        _digitTexture = Texture2D.FromFile(GraphicsDevice, "Assets/digits.png");
+        _yourScoreTexture = Texture2D.FromFile(GraphicsDevice, "Assets/yourScore.png");
     }
 
-    private static Vector2 GridToScreen(int x, int y)
-        => new(x * CellSize, y * CellSize);
+    private static Vector2 CellToScreen(int x, int y)
+        => new(BoardOffsetX + x * CellSize, BoardOffsetY + y * CellSize);
+
+    private static (int x, int y) ScreenToCell(int screenX, int screenY)
+        => new((screenX - BoardOffsetX) / CellSize, (screenY - BoardOffsetY) / CellSize);
 
     // TODO: REWRITE WITH STATES
     private void OnCellClicked(int x, int y)
@@ -117,7 +169,7 @@ public class Match3Game : Game
         _swapY2 = y;
 
 
-        EnterState(GameState.Swapping);
+        EnterGameState(GameState.Swapping);
     }
 
     // TODO: REWRITE WITH STATES
@@ -126,10 +178,9 @@ public class Match3Game : Game
         var mouse = Mouse.GetState();
         if (_previousMouseState.LeftButton == ButtonState.Pressed && mouse.LeftButton == ButtonState.Released)
         {
-            var x = mouse.X / CellSize;
-            var y = mouse.Y / CellSize;
+            var (x, y) = ScreenToCell(mouse.X, mouse.Y);
 
-            if (x is >= 0 and < 9 && y is >= 0 and < 9)
+            if (x is >= 0 and < GridHeight && y is >= 0 and < GridHeight)
                 OnCellClicked(x, y);
         }
 
@@ -161,7 +212,11 @@ public class Match3Game : Game
         };
     }
 
-    private void EnterState(GameState newState)
+    private void EnterScreenState(ScreenState state)
+    {
+    }
+
+    private void EnterGameState(GameState newState)
     {
         _state = newState;
         _animTimer = 0f;
@@ -173,15 +228,15 @@ public class Match3Game : Game
 
                 _gemAnimations.Add(new GemAnimation // CALL BEFORE SWAP -> tile will be on FROM_POSITION
                 {
-                    From = GridToScreen(_swapX1, _swapY1),
-                    To = GridToScreen(_swapX2, _swapY2),
+                    From = CellToScreen(_swapX1, _swapY1),
+                    To = CellToScreen(_swapX2, _swapY2),
                     GridX = _swapX1, GridY = _swapY1
                 });
 
                 _gemAnimations.Add(new GemAnimation // CALL BEFORE SWAP -> tile will be on FROM_POSITION
                 {
-                    From = GridToScreen(_swapX2, _swapY2),
-                    To = GridToScreen(_swapX1, _swapY1),
+                    From = CellToScreen(_swapX2, _swapY2),
+                    To = CellToScreen(_swapX1, _swapY1),
                     GridX = _swapX2, GridY = _swapY2
                 });
                 break;
@@ -193,8 +248,8 @@ public class Match3Game : Game
                          _board.CalcBonusAnimPositions(_swapX1, _swapY1, _swapX2, _swapY2))
                     _gemAnimations.Add(new GemAnimation // CALL BEFORE SWAP -> tile will be on FROM_POSITION
                     {
-                        From = GridToScreen(fromX, fromY),
-                        To = GridToScreen(toX, toY),
+                        From = CellToScreen(fromX, fromY),
+                        To = CellToScreen(toX, toY),
                         GridX = fromX, GridY = fromY
                     });
 
@@ -239,8 +294,8 @@ public class Match3Game : Game
                             {
                                 LaunchTime = cascadeBaseTime,
                                 Type = DestroyerType.West,
-                                From = GridToScreen(ev.X, ev.Y),
-                                To = GridToScreen(-1, ev.Y),
+                                From = CellToScreen(ev.X, ev.Y),
+                                To = CellToScreen(-1, ev.Y),
                                 TravelDuration = (ev.X + 1) * RemovalAnimDuration
                             });
                             // East destroyer
@@ -248,8 +303,8 @@ public class Match3Game : Game
                             {
                                 LaunchTime = cascadeBaseTime,
                                 Type = DestroyerType.East,
-                                From = GridToScreen(ev.X, ev.Y),
-                                To = GridToScreen(_board.GetXSize(), ev.Y),
+                                From = CellToScreen(ev.X, ev.Y),
+                                To = CellToScreen(_board.GetXSize(), ev.Y),
                                 TravelDuration = (_board.GetXSize() - ev.X) * RemovalAnimDuration
                             });
                             break;
@@ -259,8 +314,8 @@ public class Match3Game : Game
                             {
                                 LaunchTime = cascadeBaseTime,
                                 Type = DestroyerType.North,
-                                From = GridToScreen(ev.X, ev.Y),
-                                To = GridToScreen(ev.X, -1),
+                                From = CellToScreen(ev.X, ev.Y),
+                                To = CellToScreen(ev.X, -1),
                                 TravelDuration = (ev.Y + 1) * RemovalAnimDuration
                             });
 
@@ -269,8 +324,8 @@ public class Match3Game : Game
                             {
                                 LaunchTime = cascadeBaseTime,
                                 Type = DestroyerType.South,
-                                From = GridToScreen(ev.X, ev.Y),
-                                To = GridToScreen(ev.X, _board.GetYSize()),
+                                From = CellToScreen(ev.X, ev.Y),
+                                To = CellToScreen(ev.X, _board.GetYSize()),
                                 TravelDuration = (_board.GetYSize() - ev.Y) * RemovalAnimDuration
                             });
                             break;
@@ -281,8 +336,8 @@ public class Match3Game : Game
                             {
                                 LaunchTime = cascadeBaseTime,
                                 Type = DestroyerType.North,
-                                From = GridToScreen(ev.X, ev.Y),
-                                To = GridToScreen(ev.X, -1),
+                                From = CellToScreen(ev.X, ev.Y),
+                                To = CellToScreen(ev.X, -1),
                                 TravelDuration = (ev.Y + 1) * RemovalAnimDuration
                             });
 
@@ -292,8 +347,8 @@ public class Match3Game : Game
                             {
                                 LaunchTime = cascadeBaseTime,
                                 Type = DestroyerType.West,
-                                From = GridToScreen(ev.X, ev.Y),
-                                To = GridToScreen(-1, ev.Y),
+                                From = CellToScreen(ev.X, ev.Y),
+                                To = CellToScreen(-1, ev.Y),
                                 TravelDuration = (ev.X + 1) * RemovalAnimDuration
                             });
 
@@ -302,8 +357,8 @@ public class Match3Game : Game
                             {
                                 LaunchTime = cascadeBaseTime,
                                 Type = DestroyerType.South,
-                                From = GridToScreen(ev.X, ev.Y),
-                                To = GridToScreen(ev.X, _board.GetYSize()),
+                                From = CellToScreen(ev.X, ev.Y),
+                                To = CellToScreen(ev.X, _board.GetYSize()),
                                 TravelDuration = (_board.GetYSize() - ev.Y) * RemovalAnimDuration
                             });
 
@@ -312,8 +367,8 @@ public class Match3Game : Game
                             {
                                 LaunchTime = cascadeBaseTime,
                                 Type = DestroyerType.East,
-                                From = GridToScreen(ev.X, ev.Y),
-                                To = GridToScreen(_board.GetXSize(), ev.Y),
+                                From = CellToScreen(ev.X, ev.Y),
+                                To = CellToScreen(_board.GetXSize(), ev.Y),
                                 TravelDuration = (_board.GetXSize() - ev.X) * RemovalAnimDuration
                             });
                             break;
@@ -325,8 +380,8 @@ public class Match3Game : Game
                                 {
                                     LaunchTime = cascadeBaseTime,
                                     Type = DestroyerType.North,
-                                    From = GridToScreen(i, ev.Y),
-                                    To = GridToScreen(i, -1),
+                                    From = CellToScreen(i, ev.Y),
+                                    To = CellToScreen(i, -1),
                                     TravelDuration = (ev.Y + 1) * RemovalAnimDuration
                                 });
 
@@ -335,8 +390,8 @@ public class Match3Game : Game
                                 {
                                     LaunchTime = cascadeBaseTime,
                                     Type = DestroyerType.South,
-                                    From = GridToScreen(i, ev.Y),
-                                    To = GridToScreen(i, _board.GetYSize()),
+                                    From = CellToScreen(i, ev.Y),
+                                    To = CellToScreen(i, _board.GetYSize()),
                                     TravelDuration = (_board.GetYSize() - ev.Y) * RemovalAnimDuration
                                 });
                             }
@@ -351,8 +406,8 @@ public class Match3Game : Game
                                 {
                                     LaunchTime = cascadeBaseTime,
                                     Type = DestroyerType.West,
-                                    From = GridToScreen(ev.X, j),
-                                    To = GridToScreen(-1, j),
+                                    From = CellToScreen(ev.X, j),
+                                    To = CellToScreen(-1, j),
                                     TravelDuration = (ev.X + 1) * RemovalAnimDuration
                                 });
                                 // East destroyer
@@ -360,8 +415,8 @@ public class Match3Game : Game
                                 {
                                     LaunchTime = cascadeBaseTime,
                                     Type = DestroyerType.East,
-                                    From = GridToScreen(ev.X, j),
-                                    To = GridToScreen(_board.GetXSize(), j),
+                                    From = CellToScreen(ev.X, j),
+                                    To = CellToScreen(_board.GetXSize(), j),
                                     TravelDuration = (_board.GetXSize() - ev.X) * RemovalAnimDuration
                                 });
                             }
@@ -383,8 +438,8 @@ public class Match3Game : Game
                 {
                     _gemAnimations.Add(new GemAnimation
                     {
-                        From = GridToScreen(fx, fromY),
-                        To = GridToScreen(fx, toY),
+                        From = CellToScreen(fx, fromY),
+                        To = CellToScreen(fx, toY),
                         GridX = fx, GridY = fromY // рисуем до падения -> фишка будет на fromY
                     });
                 }
@@ -402,8 +457,8 @@ public class Match3Game : Game
                 {
                     _gemAnimations.Add(new GemAnimation
                     {
-                        From = GridToScreen(fx, fromY),
-                        To = GridToScreen(fx, toY),
+                        From = CellToScreen(fx, fromY),
+                        To = CellToScreen(fx, toY),
                         GridX = fx, GridY = toY // рисуем после падения -> фишка будет на toY
                     });
                 }
@@ -420,8 +475,65 @@ public class Match3Game : Game
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
+        if (_state == GameState.Idle && _screenState == ScreenState.Playing)
+        {
+            _timeRemaining -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+        }
+
+        if (_timeRemaining <= 0)
+        {
+            _timeRemaining = 0f;
+            _screenState = ScreenState.GameOver;
+        }
         // TODO: Add your update logic here (input handling, physics, etc.)
 
+        switch (_screenState)
+        {
+            case ScreenState.MainMenu:
+                UpdateMainMenu(gameTime);
+                break;
+
+            case ScreenState.Playing:
+                UpdateGame(gameTime);
+                break;
+
+            case ScreenState.GameOver:
+                UpdateGameOver(gameTime);
+                break;
+        }
+
+        _previousMouseState = Mouse.GetState();
+        base.Update(gameTime);
+    }
+
+    protected void UpdateMainMenu(GameTime gameTime)
+    {
+        var mouse = Mouse.GetState();
+        bool clicked = mouse.LeftButton == ButtonState.Released
+                       && _previousMouseState.LeftButton == ButtonState.Pressed;
+
+        if (clicked && _playButtonRect.Contains(mouse.Position))
+        {
+            StartNewGame();
+            _screenState = ScreenState.Playing;
+        }
+    }
+
+    protected void UpdateGameOver(GameTime gameTime)
+    {
+        var mouse = Mouse.GetState();
+        bool clicked = mouse.LeftButton == ButtonState.Released
+                       && _previousMouseState.LeftButton == ButtonState.Pressed;
+
+        if (clicked && _newGameButtonRect.Contains(mouse.Position))
+        {
+            StartNewGame();
+            _screenState = ScreenState.Playing;
+        }
+    }
+
+    protected void UpdateGame(GameTime gameTime)
+    {
         var dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
         switch (_state)
@@ -457,7 +569,7 @@ public class Match3Game : Game
                             _board.MarkDirty(_swapX1, _swapY1);
                             _board.MarkDirty(_swapX2, _swapY2);
 
-                            EnterState(_board.FindMatches() ? GameState.Matching : GameState.SwappingBack);
+                            EnterGameState(_board.FindMatches() ? GameState.Matching : GameState.SwappingBack);
 
                             break;
                         case (true, false):
@@ -467,7 +579,7 @@ public class Match3Game : Game
 
                             bonusActivator!(_swapX2, _swapY2, ActivationDuration);
 
-                            EnterState(_board.FindMatches() ? GameState.Matching : GameState.Removing);
+                            EnterGameState(_board.FindMatches() ? GameState.Matching : GameState.Removing);
 
                             break;
 
@@ -478,7 +590,7 @@ public class Match3Game : Game
 
                             bonusActivator!(_swapX1, _swapY1, ActivationDuration);
 
-                            EnterState(_board.FindMatches() ? GameState.Matching : GameState.Removing);
+                            EnterGameState(_board.FindMatches() ? GameState.Matching : GameState.Removing);
 
                             break;
 
@@ -488,7 +600,7 @@ public class Match3Game : Game
 
                             bonusActivator!(_swapX2, _swapY2, ActivationDuration);
 
-                            EnterState(_board.FindMatches() ? GameState.Matching : GameState.Removing);
+                            EnterGameState(_board.FindMatches() ? GameState.Matching : GameState.Removing);
                             break;
                     }
                 }
@@ -501,7 +613,7 @@ public class Match3Game : Game
                 if (_animTimer >= AnimDuration)
                 {
                     _board.Swap(_swapX1, _swapY1, _swapX2, _swapY2);
-                    EnterState(GameState.Idle);
+                    EnterGameState(GameState.Idle);
                 }
 
                 break;
@@ -512,7 +624,7 @@ public class Match3Game : Game
                 {
                     _board.CreateBonuses(_swapX1, _swapY1, _swapX2, _swapY2);
                     _board.MarkMatches();
-                    EnterState(GameState.Removing);
+                    EnterGameState(GameState.Removing);
                 }
 
                 break;
@@ -524,12 +636,12 @@ public class Match3Game : Game
                 {
                     if (_board.HasBonusMatches())
                     {
-                        EnterState(GameState.CreateBonuses);
+                        EnterGameState(GameState.CreateBonuses);
                     }
                     else
                     {
                         _board.MarkMatches();
-                        EnterState(GameState.Removing);
+                        EnterGameState(GameState.Removing);
                     }
                 }
 
@@ -545,7 +657,7 @@ public class Match3Game : Game
                     _destroyerAnimations.Clear();
                     _board.CallDestruction();
                     _board.ReshuffleFreeGems();
-                    EnterState(GameState.Falling);
+                    EnterGameState(GameState.Falling);
                 }
 
                 break;
@@ -556,7 +668,7 @@ public class Match3Game : Game
                 if (_animTimer >= AnimDuration)
                 {
                     _board.FallCols(); // CALLING AFTER ANIMATION
-                    EnterState(GameState.Filling);
+                    EnterGameState(GameState.Filling);
                 }
 
                 break;
@@ -564,15 +676,13 @@ public class Match3Game : Game
                 _animTimer += dt;
                 if (_animTimer >= AnimDuration)
                 {
-                    EnterState(_board.FindMatches() ? GameState.Matching : GameState.Idle);
+                    EnterGameState(_board.FindMatches() ? GameState.Matching : GameState.Idle);
                 }
 
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
         }
-
-        base.Update(gameTime);
     }
 
     private Color GetGemColor(Gem gem)
@@ -592,36 +702,151 @@ public class Match3Game : Game
     protected override void Draw(GameTime gameTime)
     {
         // Clear the screen with a specific color (standard is CornflowerBlue)
-        GraphicsDevice.Clear(Color.LightGoldenrodYellow);
+        GraphicsDevice.Clear(new Color(252, 248, 230));
 
         // TODO: Add your drawing code here
 
         _spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
-
-        var t = Math.Clamp(_animTimer / AnimDuration, 0f, 1f);
-
-        // Background
-        for (var x = 0; x < 8; x++)
-        for (var y = 0; y < 8; y++)
+        switch (_screenState)
         {
-            var cellColor = (x + y) % 2 == 0
-                ? new Color(50, 40, 70)
-                : new Color(35, 25, 55);
-
-            _spriteBatch.Draw(_pixel,
-                new Rectangle(x * CellSize, y * CellSize, CellSize, CellSize),
-                cellColor);
+            case ScreenState.MainMenu:
+                DrawMainMenu(gameTime);
+                break;
+            case ScreenState.Playing:
+                DrawGame(gameTime);
+                DrawHud(gameTime);
+                break;
+            case ScreenState.GameOver:
+                DrawGameOver(gameTime);
+                break;
         }
 
+        _spriteBatch.End();
+        base.Draw(gameTime);
+    }
+
+    protected void DrawMainMenu(GameTime gameTIme)
+    {
+        DrawNotebookBackground();
+
+        var mouse = Mouse.GetState();
+        var hover = _playButtonRect.Contains(mouse.Position);
+        var color = hover ? Color.LightGray * 0.15f : Color.White * 0f;
+
+        _spriteBatch.Draw(_pixel, _playButtonRect, color);
+        _spriteBatch.Draw(_playButtonTexture,
+            new Vector2(_playButtonRect.Center.X - 100, _playButtonRect.Center.Y - 30),
+            Color.White);
+    }
+
+    protected void DrawGameOver(GameTime gameTIme)
+    {
+        DrawNotebookBackground();
+
+        var mouse = Mouse.GetState();
+        var hover = _newGameButtonRect.Contains(mouse.Position);
+        var color = hover ? Color.LightGray * 0.15f : Color.White * 0f;
+
+        _spriteBatch.Draw(_gameOverTexture,
+            new Vector2(_newGameButtonRect.Center.X - 100,
+                _newGameButtonRect.Center.Y - 30 - _newGameButtonRect.Height - 60 - 10),
+            Color.White);
+
+        _spriteBatch.Draw(_yourScoreTexture,
+            new Vector2(_newGameButtonRect.Center.X - 100,
+                _newGameButtonRect.Center.Y - 30 - _newGameButtonRect.Height),
+            Color.White);
+        DrawNumber(_board.GetScore(),
+            new Vector2(_newGameButtonRect.Center.X + 100,
+                _newGameButtonRect.Center.Y - 30 - _newGameButtonRect.Height + 5),
+            1f); // Y + score texture + offset 
+
+        _spriteBatch.Draw(_pixel, _newGameButtonRect, color);
+        _spriteBatch.Draw(_newGameButtonTexture,
+            new Vector2(_newGameButtonRect.Center.X - 100, _newGameButtonRect.Center.Y - 30),
+            Color.White);
+    }
+
+    private void DrawNotebookBackground()
+    {
+        int w = _graphics.PreferredBackBufferWidth;
+        int h = _graphics.PreferredBackBufferHeight;
+        // _spriteBatch.Draw(_pixel, new Rectangle(0, 0, w, h), new Color(252, 248, 230));
+
+        var lineColor = new Color(150, 180, 220);
+        for (var y = BoardOffsetY + CellSize; y <= BoardOffsetY + GridHeight * CellSize; y += CellSize)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(0, y, w, 1), lineColor);
+        }
+
+        for (var x = BoardOffsetX; x < BoardOffsetX + GridHeight * CellSize; x += CellSize)
+        {
+            _spriteBatch.Draw(_pixel, new Rectangle(x, 0, 1, h - HudHeight), lineColor);
+        }
+
+        _spriteBatch.Draw(_pixel, new Rectangle(BoardOffsetX + CellSize, 0, 1, h), Color.DarkRed);
+    }
+
+    private void DrawNumber(int number, Vector2 position, float scale = 1f)
+    {
+        var strNumber = number.ToString();
+        var x = position.X;
+
+        foreach (var ch in strNumber)
+        {
+            int digit = ch - '0'; // ASCII ch ('0':48 , '1':49, '2': 50, etc.) - ASCII '0':48 = int digit
+            var sourceRect = new Rectangle(digit * DigitWidth, 0, DigitWidth, DigitHeight);
+            var destRect = new Rectangle(
+                (int)x, (int)position.Y,
+                (int)(DigitWidth * scale), (int)(DigitHeight * scale));
+
+            _spriteBatch.Draw(_digitTexture, destRect, sourceRect, Color.White);
+            x += DigitWidth * scale;
+        }
+    }
+
+    private void DrawHud(GameTime gameTime)
+    {
+        //Background
+        _spriteBatch.Draw(_pixel,
+            new Rectangle(0, CellSize * GridHeight + 1, CellSize * GridHeight - 1, HudHeight),
+            new Color(252, 248, 230));
+
+        //Redline
+        _spriteBatch.Draw(_pixel, new Rectangle(BoardOffsetX + CellSize, GridHeight * CellSize, 1, HudHeight),
+            Color.DarkRed);
+
+        _spriteBatch.Draw(_scoreTexture, new Vector2(CellSize + 10, CellSize * GridHeight + 10), Color.Black);
+        // Score
+        DrawNumber(_board.GetScore(),
+            new Vector2(_scoreTexture.Width + CellSize + 10 + 10, CellSize * GridHeight + 20),
+            0.7f); // Y + score texture + offset 
+
+        // "TIME" lined on right
+        var timeLabelX = _graphics.PreferredBackBufferWidth - _timeTexture.Width - DigitWidth * 2 - 20;
+        _spriteBatch.Draw(_timeTexture, new Vector2(timeLabelX, CellSize * GridHeight + 10), Color.Black);
+        // TIMER
+        int seconds = (int)Math.Ceiling(_timeRemaining);
+        DrawNumber(seconds,
+            new Vector2(timeLabelX + _timeTexture.Width,
+                CellSize * GridHeight + 20), 0.7f); // Y + score texture + offset
+    }
+
+    protected void DrawGame(GameTime gameTIme)
+    {
+        var t = Math.Clamp(_animTimer / AnimDuration, 0f, 1f);
+
+        DrawNotebookBackground();
+
         // Gems
-        for (var x = 0; x < 8; x++)
-        for (var y = 0; y < 8; y++)
+        for (var x = 0; x < GridHeight; x++)
+        for (var y = 0; y < GridHeight; y++)
         {
             var gem = _board.GetGem(x, y);
             if (gem is null) continue;
 
             // var color = GetGemColor(gem);
-            var pos = GridToScreen(x, y);
+            var pos = CellToScreen(x, y);
 
             var scale = 1f;
             var alpha = 1f;
@@ -749,14 +974,10 @@ public class Match3Game : Game
         if (_selected is not null)
         {
             var (sx, sy) = _selected.Value;
+            var screenPos = CellToScreen(sx, sy);
             _spriteBatch.Draw(_pixel,
-                new Rectangle(sx * CellSize, sy * CellSize, CellSize, CellSize),
-                Color.White * 0.3f); // полупрозрачная подсветка поверх
+                new Rectangle((int)screenPos.X, (int)screenPos.Y, CellSize, CellSize),
+                Color.White * 0.25f); // полупрозрачная подсветка поверх
         }
-
-
-        _spriteBatch.End();
-
-        base.Draw(gameTime);
     }
 }
