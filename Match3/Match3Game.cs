@@ -278,9 +278,8 @@ public class Match3Game : Game
                     _processedActivations.Add((ev.X, ev.Y));
 
                     var cascadeBaseTime = triggerTime + ActivationDuration;
-
-                    var bonusType = _board.ResolveBonusType(gem._getBonusType(), BonusType.None);
-                    var bonusActivator = _board.ResolveBonusActivator(bonusType);
+                    
+                    var bonusActivator = _board.ResolveBonusActivator(gem._getBonusType());
 
                     switch (gem._getBonusType())
                     {
