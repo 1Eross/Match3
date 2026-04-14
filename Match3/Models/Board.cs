@@ -208,7 +208,7 @@ public class Board
         // On axis which from Line will be included in destroy area 
         for (var i = x1 - 1; i <= x1 + 1; i++)
         {
-            if (!InBounds(x1, i)) continue;
+            if (!InBounds(i, y1)) continue;
             MarkLineVertical(i, y1, i, y1, 0f);
 
             for (var j = y1 + 1; j < YSize; j++)
