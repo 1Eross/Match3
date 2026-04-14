@@ -682,7 +682,7 @@ public class Board
 
         for (var x = 0; x < XSize; x++)
         {
-            if (!_hasMatchCol[x]) continue;
+            if (!_dirtyCols[x]) continue;
 
             var writePos = YSize - 1;
             for (var y = YSize - 1; y >= 0; y--)
@@ -750,7 +750,7 @@ public class Board
 
         for (var x = 0; x < XSize; x++)
         {
-            if (!_hasMatchCol[x]) continue;
+            if (!_dirtyCols[x]) continue;
             for (var y = _lastNoneInCol[x]; y >= 0; y--)
                 result.Add((x, y - _lastNoneInCol[x] - 1, y));
         }
