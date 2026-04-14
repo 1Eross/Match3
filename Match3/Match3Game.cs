@@ -62,7 +62,7 @@ public class Match3Game : Game
     private const int WindowWidth = GridHeight * CellSize;
     private const int WindowHeight = GridHeight * CellSize + HudHeight;
 
-    private const float _gameDuration = 60f;
+    private const float _gameDuration = 5f;
     private float _timeRemaining = _gameDuration;
 
     public Match3Game()
@@ -309,7 +309,7 @@ public class Match3Game : Game
                     _processedActivations.Add((ev.X, ev.Y));
 
                     var cascadeBaseTime = triggerTime + ActivationDuration;
-                    
+
                     var bonusActivator = _board.ResolveBonusActivator(gem._getBonusType());
 
                     switch (gem._getBonusType())
@@ -553,8 +553,8 @@ public class Match3Game : Game
 
         if (clicked && _newGameButtonRect.Contains(mouse.Position))
         {
-            StartNewGame();
-            _screenState = ScreenState.Playing;
+            // StartNewGame();
+            _screenState = ScreenState.MainMenu;
         }
     }
 
