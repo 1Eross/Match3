@@ -212,10 +212,6 @@ public class Match3Game : Game
         };
     }
 
-    private void EnterScreenState(ScreenState state)
-    {
-    }
-
     private void EnterGameState(GameState newState)
     {
         _state = newState;
@@ -245,7 +241,7 @@ public class Match3Game : Game
                 _gemAnimations.Clear();
 
                 foreach (var (toX, toY, fromX, fromY) in
-                         _board.CalcBonusAnimPositions(_swapX1, _swapY1, _swapX2, _swapY2))
+                         _board.CalcGemToBonusCollapse(_swapX1, _swapY1, _swapX2, _swapY2))
                     _gemAnimations.Add(new GemAnimation // CALL BEFORE SWAP -> tile will be on FROM_POSITION
                     {
                         From = CellToScreen(fromX, fromY),

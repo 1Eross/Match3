@@ -24,7 +24,7 @@ public class Board
     private readonly Gem?[] _grid = new Gem [XSize * XSize];
 
     // Board fill
-    private static readonly Random Random = new Random();
+    private static readonly Random Random = new();
     private readonly Stack<GemType> _excludeList = []; // Keep GemType.None after grid generation
 
     // Auxiliary arrays
@@ -38,11 +38,11 @@ public class Board
     private readonly HashSet<(int, int)> _protectedForRemoval = []; // (y, x)
     private readonly Stack<Gem> _freeGems = [];
     private readonly List<Match> _foundMatches = [];
-    private readonly Dictionary<int, List<int>> _unionGroups = new();
+    private readonly Dictionary<int, List<int>> _unionGroups = new(); // root: [indices masks _foundMatches]
 
     //Destruction
-    private readonly Queue<DestructionEvent> _destructionEventQueue = new(); // (x, y)
-    private readonly HashSet<(int, int)> _scheduleForRemoval = [];
+    private readonly Queue<DestructionEvent> _destructionEventQueue = new(); // For animations
+    private readonly HashSet<(int, int)> _scheduleForRemoval = []; // For logic
 
     // Score
     private int _score = 0;
@@ -164,10 +164,6 @@ public class Board
     }
 
 // Bonus activation
-    private void ActivateBonus()
-    {
-    }
-
     private void ActivateCross(int x1, int y1, float baseTime)
     {
         // On axis where Line moves -> should explode cross
@@ -194,7 +190,7 @@ public class Board
             if (!InBounds(x1, j)) continue;
             MarkLineHorizontal(x1, j, x1, j, 0f);
 
-            for (var i = x1 + 1; i <= XSize; i++)
+            for (var i = x1 + 1; i < XSize; i++)
                 MarkLineHorizontal(i, j, x1, j, baseTime);
             for (var i = x1 - 1; i >= 0; i--)
                 MarkLineHorizontal(i, j, x1, j, baseTime);
@@ -390,13 +386,13 @@ public class Board
         };
     }
 
-    // Double passthrough, can make all in one method
-    public List<(int toX, int toY, int fromX, int fromY)> CalcBonusAnimPositions(int swapX1, int swapY1, int swapX2,
+    // Resolving 
+    public List<(int toX, int toY, int fromX, int fromY)> CalcGemToBonusCollapse(int swapX1, int swapY1, int swapX2,
         int swapY2)
     {
         var result = new List<(int x, int y, int fromX, int fromY)>();
 
-        foreach (var indices in _unionGroups.Values)
+        foreach (var indices in _unionGroups.Values) // UnionGroups already filled 
         {
             var matchGroup = indices.Select(m => _foundMatches[m]).ToList();
 
@@ -412,7 +408,7 @@ public class Board
                 var match = matchGroup[0];
                 if (match.Length < 4) continue;
 
-                // Бонус вместо перемещённого гема, иначе центр матча
+                // Bonus_pos must be on last swapped gem else bonus_pos = center
                 bonusPos = null;
                 foreach (var cell in match.GetCells())
                 {
@@ -432,7 +428,7 @@ public class Board
             foreach (var match in matchGroup)
             foreach (var cell in match.GetCells())
             {
-                result.Add((bx, by, cell.X, cell.Y));
+                result.Add((bx, by, cell.X, cell.Y)); // To center from gem pos
             }
         }
 
@@ -682,7 +678,7 @@ public class Board
 
         for (var x = 0; x < XSize; x++)
         {
-            if (!_hasMatchCol[x]) continue;
+            if (!_dirtyCols[x]) continue;
 
             var writePos = YSize - 1;
             for (var y = YSize - 1; y >= 0; y--)
@@ -750,7 +746,7 @@ public class Board
 
         for (var x = 0; x < XSize; x++)
         {
-            if (!_hasMatchCol[x]) continue;
+            if (!_dirtyCols[x]) continue;
             for (var y = _lastNoneInCol[x]; y >= 0; y--)
                 result.Add((x, y - _lastNoneInCol[x] - 1, y));
         }
